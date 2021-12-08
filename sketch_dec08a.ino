@@ -1,12 +1,10 @@
-
-#include <Statistic.h>
 const int EstepPin = 13;
 const int EdirPin = 12;
-const int EsizPin = 8;
-const int RotstepPin = 11;
-const int RotdirPin = 10;
-const int RotsizPin = 9;
-Statistic stat(true);
+const int EsizPin = 11;
+const int RotstepPin = 10;
+const int RotdirPin = 9;
+const int RotsizPin = 8;
+
 // Pins with E preface are for elevation (up/down) motors and those with Rot preface are for rotational (left/right) motors.
 void setup() {
   // put your setup code here, to run once:
@@ -30,32 +28,35 @@ void loop() {
   int bVal = analogRead(A1);
   int cVal = analogRead(A2);
   int dVal =analogRead(A3);
-  int counter = 300;
-  int Rerrors[counter];
-  int Eerrors[counter];
+  int sumESquared = 0;
+  int sumE = 0;
+  int sumRSquared = 0;
+  int sumR = 0;
   for (int i = 0; i < 300; i = i + 1) {
-    Eerrors[i] = getEerror(aVal,bVal,cVal,dVal);
-    Rerrors[i] = getRerror(aVal,bVal,cVal,dVal);
+    sumESquared += sq(getEerror(aVal,bVal,cVal,dVal));
+    sumE += getEerror(aVal,bVal,cVal,dVal);
+    sumRSquared = sq(getRerror(aVal,bVal,cVal,dVal));
+    sumR += getRerror(aVal,bVal,cVal,dVal);
   }
-  float averageEerror = stat.average(Eerrors);
-  float E_sdev = stat.pop_stdev(Eerrors);
-  float averageRerror = stat.average(Rerrors);
-  float R_sdev = stat.pop_stdev(Rerrors);
-  main(aVal,bVal,cVal,dVal);
+  float averageEerror = sumE/300;
+  float E_sdev = sqrt((sumESquared - sq(sumE))/300);
+  float averageRerror = sumR/300;
+  float R_sdev = sqrt((sumRSquared - sq(sumR))/300);
+  main(aVal,bVal,cVal,dVal,averageRerror, averageEerror, R_sdev, E_sdev);
 }
 int getRerror(int aVal,int bVal,int cVal,int dVal){
   int Rerror = (((aVal+cVal)/2) - ((bVal+dVal)/2));
-  return Rerror
+  return Rerror;
 }
 int getEerror(int aVal,int bVal,int cVal,int dVal){
   int Eerror = (((aVal+bVal)/2) - ((cVal+dVal)/2));
-  return Eerror
+  return Eerror;
 }
-void checkPin(int stepPin, int dirPin,int error, int absError, int lowerBoundary, int higherBoundary) {
-  if (absError <= lowerBoundary) {
+void checkPin(int stepPin, int dirPin,int error, int absError, float boundary, float high, float low) {
+  if (absError <= boundary) {
   digitalWrite(stepPin, LOW);
   }else {
-  if  (error > higherBoundary) {
+  if  (error > high) {
     // Set motor to move correct direction
     digitalWrite(dirPin, HIGH);
     // Start stepping in that direction
@@ -66,7 +67,7 @@ void checkPin(int stepPin, int dirPin,int error, int absError, int lowerBoundary
     // Serial.print("Showing light from upper part");
     //Serial.print("\t");
     //delay(200);
-  }else if (error < higherBoundary) {
+  }else if (error < low) {
     // Set motor to move correct direction
     digitalWrite(dirPin, LOW);
     // Start stepping in that direction
@@ -79,15 +80,14 @@ void checkPin(int stepPin, int dirPin,int error, int absError, int lowerBoundary
     //delay(200);
    }
  }
+ return;
 }
-void main(int aVal,int bVal,int cVal,int dVal, float averageRerror, float averageEerror, float Rsdev, float Esdev){
-  int currentTime = milis()
-  if(currentTime % 300000 > 295000 || currentTime % 300000 < 5000){
-    int Rerror = getRerror(aVal,bVal,cVal,dVal);
-    int Rposerror = abs(Rerror);
-    int Eerror = getEerror(aVal,bVal,cVal,dVal);
-    int Eposerror = abs(Eerror)
-    checkPin(RotstepPin, RotdirPin, Rerror, Rposerror, averageRerror, averageRerror + 2*Rsdev);
-    checkPin(EstepPin,EdirPin, Eerror, Eposerror, averageEerror, averageEerror + 2*Esdev);
-  }
+int main(int aVal,int bVal,int cVal,int dVal, float averageRerror, float averageEerror, float Rsdev, float Esdev){
+  int Rerror = getRerror(aVal,bVal,cVal,dVal);
+  int Rposerror = abs(Rerror);
+  int Eerror = getEerror(aVal,bVal,cVal,dVal);
+  int Eposerror = abs(Eerror);
+  checkPin(RotstepPin, RotdirPin, Rerror, Rposerror, averageRerror, averageRerror + 2*Rsdev, averageRerror - 2*Rsdev);
+  checkPin(EstepPin,EdirPin, Eerror, Eposerror, averageEerror, averageEerror + 2*Esdev,averageEerror - 2*Esdev );
+  return 0;
 }
